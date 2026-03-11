@@ -26,3 +26,17 @@ backend/
     manage.py
 data/
     voters.csv
+
+## Setup
+
+1. Clone the repository
+2. Create virtual environment
+3. Install dependencies
+4. Run migrations
+5. Start the server
+
+## Future Improvements
+
+- Hindi search optimization
+- Full text search
+- Deploy to cloud
