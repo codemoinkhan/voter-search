@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voter Search</title>
+    {% load static %}
+
+    <!-- jsPDF core -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- jsPDF AutoTable plugin -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        /* Basic reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* Body background */
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        /* Container for search */
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            padding: 40px 30px 30px 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin-bottom: 20px;
+            position: relative;
+            /* For positioning logout button */
+        }
+
+        /* Logout button at top-right corner of container */
+        .logout-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+
+        button.logout-btn {
+            background: #e74c3c;
+            color: white;
+            padding: 8px 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button.logout-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Header */
+        .container h2 {
+            text-align: center;
+            margin-bottom: 25px;
+            font-weight: 600;
+        }
+
+        /* Search row */
+        .search-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        /* Inputs and buttons */
+        input[type="text"] {
+            padding: 10px 12px;
+            border: none;
+            border-radius: 8px;
+            outline: none;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 14px;
+            min-width: 250px;
+        }
+
+        input::placeholder {
+            color: #eee;
+        }
+
+        input:focus {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        button {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 8px;
+            background: white;
+            color: #764ba2;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        /* PDF download button */
+        #download-btn {
+            display: block;
+            margin: 0 auto 15px auto;
+        }
+
+        /* Count text */
+        #count {
+            margin-bottom: 15px;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        thead {
+            background: rgba(22, 160, 133, 0.8);
+        }
+
+        th,
+        td {
+            padding: 10px;
+            text-align: left;
+            font-size: 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            color: white;
+            font-size: 13px;
+            margin-top: 10px;
+            opacity: 0.8;
+        }
+
+        /* Responsive */
+        @media(max-width:768px) {
+            .search-row {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            input[type="text"],
+            button {
+                width: 100%;
+            }
+
+            .logout-container {
+                position: static;
+                text-align: center;
+                margin-bottom: 15px;
+            }
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <!-- Main Container -->
+    <div class="container">
+
+        <!-- Logout Button Top-Right -->
+        <div class="logout-container">
+            <form action="/logout/" method="post" style="margin:0;">
+                {% csrf_token %}
+                <button type="submit" class="logout-btn">Logout</button>
+            </form>
+        </div>
+
+        <h2>Search Voter</h2>
+
+        <!-- Search Row -->
+        <div class="search-row">
+            <input type="text" id="name" placeholder="Enter name" onkeypress="handleKey(event)" autofocus>
+            <button onclick="search()">Search</button>
+        </div>
+
+        <!-- PDF Button -->
+        <button id="download-btn" onclick="downloadPDF()">⬇ Download PDF</button>
+
+        <p id="count"></p>
+
+        <!-- Results Table -->
+        <table id="results">
+            <thead>
+                <tr>
+                    <th>क्रम संख्या</th>
+                    <th>मकान संख्या</th>
+                    <th>नाम</th>
+                    <th>पिता का नाम</th>
+                    <th>मतदाता आईडी</th>
+                    <th>लिंग</th>
+                    <th>आयु</th>
+                    <th>जिला</th>
+                    <th>ब्लॉक</th>
+                    <th>ग्राम पंचायत</th>
+                    <th>वार्ड</th>
+                    <th>मतदान केंद्र</th>
+                    <th>मतदान बूथ</th>
+                    <th>गांव</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        &copy; Moin Khan 2026, For Digital Solutions contact: <a href="mailto:code.moinkhan@gmail.com"
+            style="color:white; text-decoration:underline;">code.moinkhan@gmail.com</a>
+    </div>
+
+    <script>
+        // Press Enter to search
+        function handleKey(event) {
+            if (event.key === "Enter") search();
+        }
+
+        // Search API
+        function search() {
+            let name = document.getElementById("name").value;
+            if (name.trim() === "") {
+                alert("Please enter a name");
+                return;
+            }
+
+            fetch("/api/search/?name=" + encodeURIComponent(name))
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById("count").textContent = data.length + " voters found";
+                    let tableBody = document.querySelector("#results tbody");
+                    tableBody.innerHTML = "";
+
+                    if (data.length === 0) {
+                        tableBody.innerHTML = "<tr><td colspan='14'>No voters found</td></tr>";
+                        return;
+                    }
+
+                    data.forEach(v => {
+                        let row = `
+                    <tr>
+                        <td>${v.serial_number}</td>
+                        <td>${v.house_no}</td>
+                        <td>${v.name}</td>
+                        <td>${v.father_name}</td>
+                        <td>${v.voter_id}</td>
+                        <td>${v.gender}</td>
+                        <td>${v.age}</td>
+                        <td>${v.district}</td>
+                        <td>${v.block}</td>
+                        <td>${v.gram_panchayat}</td>
+                        <td>${v.ward}</td>
+                        <td>${v.polling_station}</td>
+                        <td>${v.booth}</td>
+                        <td>${v.village}</td>
+                    </tr>`;
+                        tableBody.innerHTML += row;
+                    });
+                });
+        }
+
+        // Download PDF
+        async function downloadPDF() {
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+
+                // Load Devanagari font
+                const response = await fetch("{% static 'fonts/NotoSansDevanagari-Regular.ttf' %}");
+                if (!response.ok) throw new Error("Font not found");
+
+                const fontArrayBuffer = await response.arrayBuffer();
+                const fontBase64 = btoa(
+                    new Uint8Array(fontArrayBuffer)
+                        .reduce((data, byte) => data + String.fromCharCode(byte), '')
+                );
+
+                doc.addFileToVFS("NotoSansDevanagari-Regular.ttf", fontBase64);
+                doc.addFont("NotoSansDevanagari-Regular.ttf", "Noto", "normal");
+                doc.setFont("Noto");
+
+                doc.text("Voter List", 14, 15);
+
+                // AutoTable from HTML table
+                doc.autoTable({
+                    html: "#results",
+                    startY: 20,
+                    styles: { font: "Noto", fontSize: 10 },
+                    headStyles: { fillColor: [22, 160, 133] }
+                });
+
+                doc.save("voters.pdf");
+
+            } catch (err) {
+                alert("Error generating PDF: " + err.message);
+                console.error(err);
+            }
+        }
+    </script>
+
+</body>
+
+</html>
